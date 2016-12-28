@@ -189,12 +189,33 @@
 (defun github-browse-issue (issue)
   (browse-url (get-text-property issue 'url)))
 
+(defun github-issue-comments (issue)
+  (slot-value (gh-issues-comments-list (github-gh-issues-api)
+                                       user
+                                       repo
+                                       issue-id)
+              :data))
+
 (defun github-user-button (user)
   (insert-text-button (slot-value user :login)
                       'font-lock-builtin-face 'link
                       'follow-link t
                       'url (slot-value user :html-url)
                       'action 'github-browse-issue))
+
+(defun github-issue-comments-populate (issue)
+  (let* ((user github-issues-current-user)
+         (repo github-issues-current-repo)
+         (issue-id (slot-value issue :number))
+         (comments (github-issue-comments issue)))
+    (dolist (comment comments)
+      (insert "\n---- On "
+              (format-local-timestamp (slot-value comment :updated_at))
+              " ")
+      (github-user-button (slot-value comment :user))
+      (insert " wrote:\n\n")
+      (insert (slot-value comment :body))
+      (insert "\n"))))
 
 (defun github-issue-populate (buffer issue)
   "Populates the given buffer with issue data. See `github-api-repository-issue`."
@@ -219,7 +240,8 @@
         (dolist (label (pget :labels))
           (insert "[" (github-issue-colorize-label label) "]")))
       (let ((beg (point)))
-        (insert "\n\n" (pget :body))
+        (insert "\n\n" (pget :body) "\n\n")
+        (github-issue-comments-populate issue)
         (replace-string "" "" nil beg (point)))
       (github-issue-mode)
       (visual-line-mode)
