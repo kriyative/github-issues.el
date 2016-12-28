@@ -181,39 +181,48 @@
     (github-switch-to-buffer buffer)))
 
 (defun github-issue-colorize-label (label)
-  (let ((color (format "#%s" (slot-value label :color))))
-    (propertize (slot-value label :name)
-                'font-lock-face (list :foreground color))))
+  (flet ((pget (label key) (slot-value label key)))
+    (let ((color (format "#%s" (or (pget label 'color) "00f"))))
+      (propertize (pget label 'name)
+                  'font-lock-face (list :background color)))))
+
+(defun github-browse-issue (issue)
+  (browse-url (get-text-property issue 'url)))
+
+(defun github-user-button (user)
+  (insert-text-button (slot-value user :login)
+                      'font-lock-builtin-face 'link
+                      'follow-link t
+                      'url (slot-value user :html-url)
+                      'action 'github-browse-issue))
 
 (defun github-issue-populate (buffer issue)
   "Populates the given buffer with issue data. See `github-api-repository-issue`."
-  (flet ((pget (key) (slot-value issue key)))
+  (flet ((pget (key) (safe-slot-value issue key)))
     (with-current-buffer buffer
       (toggle-read-only -1)
       (erase-buffer)
-      (insert "#")
-      (insert-text-button (number-to-string (pget :number))
+      (insert (format "%8s: " (concat "#" (number-to-string (pget :number)))))
+      (insert-text-button (pget :title)
                           'font-lock-builtin-face 'link
                           'follow-link t
                           'url (pget :html-url)
-                          'action 'github--browse-url)
-      (insert ": " (pget :title) "\n")
-      (insert "created on " (pget :created-at) " by ")
-      (insert-text-button (slot-value (pget :user) :login)
-                          'font-lock-builtin-face 'link
-                          'follow-link t
-                          'url (slot-value (pget :user) :html-url)
-                          'action 'github--browse-url)
-      (insert "\n")
+                          'action 'github-browse-issue)
+      (insert "\n Created: " (format-local-timestamp (pget :created-at)))
+      (insert "\n Updated: " (format-local-timestamp (pget :updated-at)))
+      (insert "\nReporter: ") (github-user-button (pget :user))
+      (let ((assignee (pget :assignee)))
+        (when (and assignee (safe-slot-value assignee :login))
+          (insert "\nAssignee: ") (github-user-button assignee)))
       (when (> (length (pget :labels)) 0)
-        (insert "Labels: ")
-        (dolist (label (mapcar 'github-issue-colorize-label (pget :labels)))
-          (insert "[" label "]"))
-        (insert "\n"))
+        (insert "\n  Labels: ")
+        (dolist (label (pget :labels))
+          (insert "[" (github-issue-colorize-label label) "]")))
       (let ((beg (point)))
-        (insert "\n" (pget :body))
+        (insert "\n\n" (pget :body))
         (replace-string "" "" nil beg (point)))
       (github-issue-mode)
+      (visual-line-mode)
       (github-switch-to-buffer buffer))))
 
 ;;;###autoload
