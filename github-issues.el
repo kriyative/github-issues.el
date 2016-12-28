@@ -119,6 +119,14 @@
         (setq github-issues-current-repo repo)
         (setq github-issues-current-issue issue)))))
 
+(defun format-local-timestamp (timestamp)
+  (format-time-string "%D %H:%M" (date-to-time timestamp)))
+
+(defun safe-slot-value (object slot-name)
+  (let ((v (slot-value object slot-name)))
+    (unless (eq 'unbound v)
+      v)))
+
 (defun github-tabulated-issue (issue)
   "Formats an issue data to populate the issue list."
   (flet ((pget (prop)
@@ -129,6 +137,11 @@
                         'follow-link t
                         'issue issue
                         'action 'github-issue-entry-show)
+                  (format-local-timestamp (or (slot-value issue :updated-at)
+                                              (slot-value issue :created-at)))
+                  (pget :state)
+                  (slot-value (slot-value issue :user) :login)
+                  (or (safe-slot-value (safe-slot-value issue :assignee) :login) "")
                   (propertize (pget :title) 'font-lock-face 'default)))))
 
 (defun github-issue-sort-by-issue (a b)
@@ -140,6 +153,23 @@
   "Compare two issues list entries by title."
   (flet ((title (data) (car (aref (cadr data) 0))))
     (string< (title a) (title b))))
+
+(defun github-issue-sort-col-as-text (n)
+  (lexical-let ((n n))
+    (lambda (a b)
+      (flet ((text (data) (aref (cadr data) n)))
+        (string< (text a) (text b))))))
+
+(setf (symbol-function 'github-issue-sort-by-date)
+      (github-issue-sort-col-as-text 1))
+(setf (symbol-function 'github-issue-sort-by-state)
+      (github-issue-sort-col-as-text 2))
+(setf (symbol-function 'github-issue-sort-by-reporter)
+      (github-issue-sort-col-as-text 3))
+(setf (symbol-function 'github-issue-sort-by-assignee)
+      (github-issue-sort-col-as-text 4))
+(setf (symbol-function 'github-issue-sort-by-title)
+      (github-issue-sort-col-as-text 5))
 
 (defun github-issues-populate (buffer issues-plist)
   "Populates the given buffer with a list of issues. See `github-api-repository-issues`."
@@ -252,6 +282,10 @@
 
 \\{github-issues-mode-map}"
   (setq tabulated-list-format [("Issue" 5 github-issue-sort-by-issue)
+                               ("Date"  15 github-issue-sort-by-date)
+                               ("State" 5 github-issue-sort-by-state)
+                               ("Reporter" 10 github-issue-sort-by-reporter)
+                               ("Assignee" 10 github-issue-sort-by-assignee)
                                ("Title" 60 github-issue-sort-by-title)])
   (setq tabulated-list-padding 2)
   (setq tabulated-list-sort-key (cons "Issue" nil))
