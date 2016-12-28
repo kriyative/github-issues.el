@@ -105,7 +105,7 @@
 
 (defun github-issue-buffer (user repo number)
   "Creates or return the buffer for the given user, repository and number."
-  (get-buffer-create (format "*GitHub Issue: #%s on %s/%s*" number user repo)))
+  (get-buffer-create (format "*GitHub Issue: %s/%s*" user repo)))
 
 (defun github-issue-entry-show (&optional button)
   (when button
