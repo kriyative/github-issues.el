@@ -48,6 +48,7 @@
 
 ;;; Code:
 
+(require 'gh-issues)
 (require 'tabulated-list)
 (require 'url)
 (require 'font-lock)
@@ -79,11 +80,19 @@
   "Current github issue.")
 (make-variable-buffer-local 'github-issues-current-issue)
 
+(defvar *github-gh-issues-api* nil)
+
+(defun github-gh-issues-api ()
+  (unless *github-gh-issues-api*
+    (setq *github-gh-issues-api* (gh-issues-api "github-issues-api"
+                                                :sync nil
+                                                :cache t
+                                                :num-retries 1)))
+  *github-gh-issues-api*)
 
 (defun github-api-repository-issues (user repo)
-  "Returns a list of issues in `plist` format."
-  (let ((url (format "https://api.github.com/repos/%s/%s/issues" user repo)))
-    (github-issues-parse-response (url-retrieve-synchronously url))))
+  "Returns a list of gh-issues instances."
+  (slot-value (gh-issues-issue-list (github-gh-issues-api) user repo) :data))
 
 (defun github-api-repository-issue (user repo number)
   "Return an issue data in `plist` format."
@@ -103,7 +112,7 @@
     (let* ((issue (button-get button 'issue))
            (user github-issues-current-user)
            (repo github-issues-current-repo)
-           (buffer (github-issue-buffer user repo (plist-get issue :number))))
+           (buffer (github-issue-buffer user repo (slot-value issue :number))))
       (github-issue-populate buffer issue)
       (with-current-buffer buffer
         (setq github-issues-current-user user)
@@ -113,8 +122,8 @@
 (defun github-tabulated-issue (issue)
   "Formats an issue data to populate the issue list."
   (flet ((pget (prop)
-               (format "%s" (plist-get issue prop))))
-    (list (cons (pget :id) (pget :number))
+               (format "%s" (slot-value issue prop))))
+    (list (cons (pget :url) (pget :number))
           (vector (list (pget :number)
                         'font-lock-builtin-face 'link
                         'follow-link t
@@ -142,13 +151,13 @@
     (github-switch-to-buffer buffer)))
 
 (defun github-issue-colorize-label (label)
-  (let ((color (format "#%s" (plist-get label :color))))
-    (propertize (plist-get label :name)
+  (let ((color (format "#%s" (slot-value label :color))))
+    (propertize (slot-value label :name)
                 'font-lock-face (list :foreground color))))
 
 (defun github-issue-populate (buffer issue)
   "Populates the given buffer with issue data. See `github-api-repository-issue`."
-  (flet ((pget (key) (plist-get issue key)))
+  (flet ((pget (key) (slot-value issue key)))
     (with-current-buffer buffer
       (toggle-read-only -1)
       (erase-buffer)
@@ -156,14 +165,14 @@
       (insert-text-button (number-to-string (pget :number))
                           'font-lock-builtin-face 'link
                           'follow-link t
-                          'url (pget :html_url)
+                          'url (pget :html-url)
                           'action 'github--browse-url)
       (insert ": " (pget :title) "\n")
-      (insert "created on " (pget :created_at) " by ")
-      (insert-text-button (plist-get (pget :user) :login)
+      (insert "created on " (pget :created-at) " by ")
+      (insert-text-button (slot-value (pget :user) :login)
                           'font-lock-builtin-face 'link
                           'follow-link t
-                          'url (plist-get (pget :user) :html_url)
+                          'url (slot-value (pget :user) :html-url)
                           'action 'github--browse-url)
       (insert "\n")
       (when (> (length (pget :labels)) 0)
@@ -210,7 +219,7 @@
   (interactive)
   (let ((user (or user github-issues-current-user))
         (repo (or repo github-issues-current-repo))
-        (number (plist-get github-issues-current-issue :number)))
+        (number (slot-value github-issues-current-issue :number)))
     (github-issue-populate (github-issue-buffer user repo number)
                            (github-api-repository-issue user repo number))
     (setq github-issues-current-user user)
@@ -221,7 +230,7 @@
   "Open the current issue in a web browser."
   (interactive)
   (if github-issues-current-issue
-      (browse-url (plist-get github-issues-current-issue :html_url))
+      (browse-url (slot-value github-issues-current-issue :html-url))
     (message "No current issue selected")))
 
 (defun github-issue-browse-author ()
@@ -229,7 +238,7 @@
   (interactive)
   (if github-issues-current-issue
       (browse-url (format "https://github.com/%s"
-                          (plist-get (plist-get github-issues-current-issue :user) :login)))
+                          (slot-value (slot-value github-issues-current-issue :user) :login)))
     (message "No current issue selected")))
 
 (defvar github-issues-mode-map
