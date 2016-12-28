@@ -113,11 +113,11 @@
            (user github-issues-current-user)
            (repo github-issues-current-repo)
            (buffer (github-issue-buffer user repo (slot-value issue :number))))
-      (github-issue-populate buffer issue)
       (with-current-buffer buffer
         (setq github-issues-current-user user)
         (setq github-issues-current-repo repo)
-        (setq github-issues-current-issue issue)))))
+        (setq github-issues-current-issue issue))
+      (github-issue-populate buffer issue))))
 
 (defun format-local-timestamp (timestamp)
   (format-time-string "%D %H:%M" (date-to-time timestamp)))
