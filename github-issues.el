@@ -245,6 +245,7 @@
         (replace-string "" "" nil beg (point)))
       (github-issue-mode)
       (visual-line-mode)
+      (goto-char (point-min))
       (github-switch-to-buffer buffer))))
 
 ;;;###autoload
