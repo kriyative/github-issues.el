@@ -1,0 +1,6 @@
+(:name github-issues
+       :description "Github Issues Browser"
+       :type github
+       :pkgname "kriyative/github-issues.el"
+       :depends (gh)
+       :autoloads nil)
